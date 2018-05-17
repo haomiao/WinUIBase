@@ -2,11 +2,14 @@
 #include "ksuspensionwnd.h"
 #include "ctrl/kmenuwnd.h"
 #include "kvirtualfolder.h"
+#include "infocollect/kclouddiskinfocoll.h"
 
 namespace
 {
 #define IDT_TIMER 1101
+#define IDT_TIMER_CHECK 1102
 #define ELAPSE_MILSEC_TIME 800
+#define TIMER_CHECK_ELAPSE 500
 
 #define TOP_SPACE 0
 #define ROUND_RECT_SIDE 2
@@ -38,7 +41,7 @@ namespace
 #define LOOKUP_BTN_TEXT_SIZE TEXT_FONT_HEIGHT //11
 #define LOOKUP_TIP_TEXT _T("点击查看拖拽所在目录")
 
-#define TOOLTIP_TEXT _T("快速添加到:\n拖拽文件 / 文件夹 到此")
+#define TOOLTIP_TEXT _T("文件上云，多端同步")
 
 #define MENUITEM_OPEN_WPSCLOUD _T("打开文档")
 #define MENUITEM_LOOKUP_TRANS_DETAIL _T("查看传输详情")
@@ -55,7 +58,7 @@ KSuspensionWnd::KSuspensionWnd()
 	, m_bIsLBtnDown(false)
 	, m_clBackground(DLG_BACKGROUND_COLOR)
 	, m_clBorder(DLG_BORDER_COLOR)
-	, m_clIconBackground(IMAGE_BACKGROUND_NORMAL_COLOR)
+	, m_clIconBackground(IMAGE_BACKGROUND_HOVER_COLOR)
 	, m_bTrackMouse(false)
 	, m_strInfoText(TIP_INFO_TEXT)
 	, m_pDropTarget(nullptr)
@@ -65,8 +68,8 @@ KSuspensionWnd::KSuspensionWnd()
 	, m_nOpacity(255)
 	, m_nLastOpacity(255)
 	, m_fSetLayeredWindowAttributes(nullptr)
+	, m_dwThreadId(0)
 {
-
 }
 
 KSuspensionWnd::~KSuspensionWnd()
@@ -90,18 +93,23 @@ BOOL KSuspensionWnd::CreateSuspensionWnd(
 	__in double lfScale
 	)
 {
-	return __super::CreateWnd(
+	m_lfScale = lfScale;
+	BOOL bRet = __super::CreateWnd(
 		hParentWnd,
 		L"KSuspensionWnd",
-		L"", 
+		L"KSuspensionWnd", 
 		WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
 		WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
 		x,
 		y,
-		cx * m_lfScale,
-		cy * m_lfScale,
+		cx,
+		cy,
 		m_lfScale
 		);
+	if ( bRet ) {
+		::SetTimer(m_hWnd, IDT_TIMER_CHECK, TIMER_CHECK_ELAPSE, NULL);
+	}
+	return bRet;
 }
 
 BOOL KSuspensionWnd::SetOpacity(BYTE nOpacity)
@@ -111,6 +119,13 @@ BOOL KSuspensionWnd::SetOpacity(BYTE nOpacity)
 	BOOL bResult = ChangeTransparency();
 	RePaint();
 	return bResult;
+}
+
+void KSuspensionWnd::SetDragDropThread(
+	__in DWORD dwThreadId
+	)
+{
+	m_dwThreadId = dwThreadId;
 }
 
 void KSuspensionWnd::InitResources()
@@ -181,7 +196,7 @@ void KSuspensionWnd::InitControls()
 			0,
 			0,
 			rcWnd.Width(),
-			46,
+			180,
 			m_lfScale
 			);
 		m_tooltipWnd.SetToolTip(TOOLTIP_TEXT);
@@ -215,7 +230,7 @@ BOOL KSuspensionWnd::OnCommand(WPARAM wParam, LPARAM lParam)
 				break;
 			case IDR_SUSPENSION_CLOSE:
 				{
-					ShowWindow(FALSE);
+					MenuCloseWnd();
 				}
 				break;
 			case IDM_LOOKUP_BTN:
@@ -304,13 +319,12 @@ LRESULT KSuspensionWnd::OnMouseMove(WPARAM wParam, LPARAM lParam, BOOL& bHandled
 LRESULT KSuspensionWnd::OnMouseHover(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
 	bHandled = FALSE;
-	m_clBackground = DLG_BACKGROUND_HOVER_COLOR;
-	m_clBorder = DLG_BORDER_HOVER_COLOR;
-	m_clIconBackground = IMAGE_BACKGROUND_HOVER_COLOR;
-	m_nOpacity = HOVER_OPACITY_VALUE;
-	ChangeTransparency();
-
-	RePaint();
+	//m_clBackground = DLG_BACKGROUND_HOVER_COLOR;
+	//m_clBorder = DLG_BORDER_HOVER_COLOR;
+	//m_clIconBackground = IMAGE_BACKGROUND_HOVER_COLOR;
+	//m_nOpacity = HOVER_OPACITY_VALUE;
+	//ChangeTransparency();
+	//RePaint();
 
 	ShowToolTip();
 	return 0;
@@ -319,13 +333,20 @@ LRESULT KSuspensionWnd::OnMouseHover(WPARAM wParam, LPARAM lParam, BOOL& bHandle
 LRESULT KSuspensionWnd::OnMouseLeave(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
 	m_bTrackMouse = false;
-	m_clBackground = DLG_BACKGROUND_COLOR;
-	m_clBorder = DLG_BORDER_COLOR;
-	m_clIconBackground = IMAGE_BACKGROUND_NORMAL_COLOR;
-	m_nOpacity = m_nLastOpacity;
-	ChangeTransparency();
 
-	RePaint();
+	// 在查看按钮上不改变窗口背景色与透明度
+	//RECT rcLookupWnd = {0};
+	//POINT ptCursorPos = {0};
+	//::GetCursorPos(&ptCursorPos);
+	//::GetWindowRect(m_lookupBtn.GetWnd(), &rcLookupWnd);
+	//if (! ::PtInRect(&rcLookupWnd, ptCursorPos) ) {
+	//	m_clBackground = DLG_BACKGROUND_COLOR;
+	//	m_clBorder = DLG_BORDER_COLOR;
+	//	m_clIconBackground = IMAGE_BACKGROUND_HOVER_COLOR;
+	//	m_nOpacity = m_nLastOpacity;
+	//	ChangeTransparency();
+	//	RePaint();
+	//}
 	
 	if (m_tooltipWnd.GetWindowHandle()
 		&& ::IsWindowVisible(m_tooltipWnd.GetWindowHandle()))
@@ -420,16 +441,26 @@ LRESULT KSuspensionWnd::OnTimer(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 		m_isFirstDragFile = false;
 		RePaint();
 	}
+	else if ( wParam == IDT_TIMER_CHECK ) {
+		this->ShowWindow(!IsFullScreenMode());
+	}
 
 	bHandled = TRUE;
+	return 0;
+}
+
+LRESULT KSuspensionWnd::OnClose(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
+{
+	::KillTimer(m_hWnd, IDT_TIMER_CHECK);
+
+	bHandled = FALSE;
 	return 0;
 }
 
 LRESULT KSuspensionWnd::OnDropFiles(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
 	HDROP hDrop = (HDROP)wParam;
-	if (!hDrop)
-	{
+	if ( hDrop == NULL ) {
 		return 0;
 	}
 
@@ -443,16 +474,55 @@ LRESULT KSuspensionWnd::OnDropFiles(WPARAM wParam, LPARAM lParam, BOOL& bHandled
 	m_nIDEvent =
 		::SetTimer(m_hWnd, IDT_TIMER, ELAPSE_MILSEC_TIME, (TIMERPROC)nullptr);
 
+	std::list<std::wstring>* pltFiles = new std::list<std::wstring>;
+	if ( pltFiles == NULL ) {
+		::DragFinish(hDrop);
+		bHandled = TRUE;
+		return 0;
+	}
+
 	// 获取拖拽文件列表
-	std::list<std::wstring> listFileName;
 	UINT nFileNumber = ::DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
 	WCHAR szPath[MAX_PATH];
 	for (UINT index = 0; index < nFileNumber; ++index)
 	{
 		::DragQueryFileW(hDrop, index, szPath, MAX_PATH);
-		listFileName.emplace_back(szPath);
+		pltFiles->push_back(szPath);
 	}
 	::DragFinish(hDrop);
+
+	// 信息收集
+	TString tstrFileSize;
+	tstrFileSize.Format(L"%d", (DWORD)pltFiles->size());
+
+	std::list<std::wstring> ltParam;
+	ltParam.push_back(L"Desktopdockablewnd");
+	ltParam.push_back(L"dragdrop");
+	ltParam.push_back(tstrFileSize.Data());
+	KDesktopDockableWnd.SendInfoColl(ltParam);
+
+	ltParam.clear();
+	ltParam.push_back(L"new_files_source");
+	ltParam.push_back(L"Desktopdockablewnd");
+	ltParam.push_back(tstrFileSize.Data());
+	KDesktopDockableWnd.SendInfoColl(ltParam);
+
+	CloudFileInfoColl::AsynSendCloudFileSaveasInfo(
+		KDesktopDockableWnd.GetCurrentUserId(), 
+		L"qingnse"
+		);
+
+	if ( m_dwThreadId != 0 && pltFiles->size() > 0 ) {
+		::PostThreadMessageW(
+			m_dwThreadId, 
+			ID_DOCKABLEWND_ADDFILE, 
+			(WPARAM)pltFiles, 
+			NULL
+			);
+	}
+	else {
+		delete pltFiles;
+	}
 
 	bHandled = TRUE;
 	return 0;
@@ -460,13 +530,13 @@ LRESULT KSuspensionWnd::OnDropFiles(WPARAM wParam, LPARAM lParam, BOOL& bHandled
 
 LRESULT KSuspensionWnd::OnDropEnter(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	m_clBackground = DLG_BACKGROUND_HOVER_COLOR;
-	m_clBorder = DLG_BORDER_HOVER_COLOR;
-	m_clIconBackground = IMAGE_BACKGROUND_HOVER_COLOR;
+	//m_clBackground = DLG_BACKGROUND_HOVER_COLOR;
+	//m_clBorder = DLG_BORDER_HOVER_COLOR;
+	//m_clIconBackground = IMAGE_BACKGROUND_HOVER_COLOR;
 	m_strInfoText = TIP_DRAG_TEXT;
 	m_isShowLookupBtn = false;
-	m_nOpacity = HOVER_OPACITY_VALUE;
-	ChangeTransparency();
+	//m_nOpacity = HOVER_OPACITY_VALUE;
+	//ChangeTransparency();
 
 	if (m_lookupBtn.GetSafeHWND()
 		&& ::IsWindowVisible(m_lookupBtn.GetSafeHWND()))
@@ -481,11 +551,11 @@ LRESULT KSuspensionWnd::OnDropEnter(WPARAM wParam, LPARAM lParam, BOOL& bHandled
 
 LRESULT KSuspensionWnd::OnDropLeave(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	m_clBackground = DLG_BACKGROUND_COLOR;
-	m_clBorder = DLG_BORDER_COLOR;
-	m_clIconBackground = IMAGE_BACKGROUND_NORMAL_COLOR;
-	m_nOpacity = m_nLastOpacity;
-	ChangeTransparency();
+	//m_clBackground = DLG_BACKGROUND_COLOR;
+	//m_clBorder = DLG_BORDER_COLOR;
+	//m_clIconBackground = IMAGE_BACKGROUND_NORMAL_COLOR;
+	//m_nOpacity = m_nLastOpacity;
+	//ChangeTransparency();
 
 	if (!m_isFirstDragFile)
 	{
@@ -614,6 +684,11 @@ void KSuspensionWnd::StopTimer()
 
 void KSuspensionWnd::OpenWPSCloud()
 {
+	std::list<std::wstring> ltParam;
+	ltParam.push_back(L"Desktopdockablewnd");
+	ltParam.push_back(L"open_nse");
+	KDesktopDockableWnd.SendInfoColl(ltParam);
+
 	IShellFolder *pIShellFolder = NULL;
 	LPITEMIDLIST pNsePidl = NULL;
 	PIDLIST_ABSOLUTE pidlBind = NULL;
@@ -689,6 +764,11 @@ REALSE_INTERFACE:
 
 void KSuspensionWnd::ShowTransDetail()
 {
+	std::list<std::wstring> ltParam;
+	ltParam.push_back(L"Desktopdockablewnd");
+	ltParam.push_back(L"open_transdetail");
+	KDesktopDockableWnd.SendInfoColl(ltParam);
+
 	PEXPLORER_THREAD_PARAMTER pThreadParam = 
 		g_kNseModule.GetThreadParamter();
 	if (pThreadParam)
@@ -707,8 +787,54 @@ void KSuspensionWnd::ShowTransDetail()
 
 void KSuspensionWnd::OpenDragDir()
 {
-	
-}	
+	std::list<std::wstring> ltParam;
+	ltParam.push_back(L"Desktopdockablewnd");
+	ltParam.push_back(L"Lookup_nsedir");
+	KDesktopDockableWnd.SendInfoColl(ltParam);
+
+	TString tstrId;
+	TString tstrName;
+	KCloudItemPtr pDir = KDesktopDockableWnd.GetAddFileDir();
+	if ( pDir != NULL ) {
+		tstrId = pDir->uid();
+		tstrName = pDir->name();
+	}
+	TString tstrUserId = KDesktopDockableWnd.GetCurrentUserId();
+
+	KVirtualFolder::WriteRegister(
+		NSE_BROWSER_USEID, 
+		tstrUserId.Data()
+		);
+	KVirtualFolder::WriteRegister(
+		NSE_BROWSER_RECORD_ID, 
+		tstrId.Data()
+		);
+	KVirtualFolder::WriteRegister(
+		NSE_BROWSER_RECORD_NAME, 
+		tstrName.Data()
+		);
+	KVirtualFolder::WriteRegister(
+		NSE_BROWSER_SELECTED_ID, 
+		L""
+		);
+	OpenWPSCloud();
+}
+
+void KSuspensionWnd::MenuCloseWnd()
+{
+	std::list<std::wstring> ltParam;
+	ltParam.push_back(L"Desktopdockablewnd");
+	ltParam.push_back(L"close_wnd");
+	KDesktopDockableWnd.SendInfoColl(ltParam);
+
+	CloseWnd(0);
+	::PostThreadMessageW(
+		m_dwThreadId, 
+		ID_DOCKABLEWND_CLOSEWND, 
+		NULL, 
+		NULL
+		);
+}
 
 void KSuspensionWnd::GetToolTipType(
 	__out KToolTipWnd::TOOLTIP_POS_TOWARD& ePosToward,
@@ -848,7 +974,7 @@ void KSuspensionWnd::DrawBackground(HDC hDC)
 
 	HBRUSH hIconBrush = ::CreateSolidBrush(m_clIconBackground);
 	HBRUSH hOldBrush = (HBRUSH)::SelectObject(hDC, hIconBrush);
-	::Rectangle(hDC, 0, 0, IMAGE_WIDTH * m_lfScale, nHeight - 2);
+	::Rectangle(hDC, 0, 0, IMAGE_WIDTH * m_lfScale, nHeight - 1);
 	::SelectObject(hDC, hOldBrush);
 	SAFE_DELETE_OBJECT(hIconBrush);
 
@@ -859,7 +985,7 @@ void KSuspensionWnd::DrawBackground(HDC hDC)
 		IMAGE_WIDTH * m_lfScale - 1,
 		0,
 		nWidth - 1,
-		nHeight - 2
+		nHeight - 1
 		);
 	::SelectObject(hDC, hOldBrush);
 	SAFE_DELETE_OBJECT(hTextBrush);
@@ -890,9 +1016,9 @@ void KSuspensionWnd::DrawOthers(HDC hDC)
 		graphics.SetSmoothingMode(SmoothingModeHighSpeed);
 
 		rcImg.X = IMAGE_LEFT_HOLLOW * m_lfScale;
-		rcImg.Y = IMAGE_TOP_HOLLOW * m_lfScale; 
 		rcImg.Width = (Gdiplus::REAL)(m_pIconImg->GetWidth() * m_lfScale); 
 		rcImg.Height = (Gdiplus::REAL)(m_pIconImg->GetHeight() * m_lfScale);
+		rcImg.Y = (nHeight - rcImg.Height) / 2;
 
 		graphics.DrawImage(
 			m_pIconImg,
@@ -975,4 +1101,28 @@ void KSuspensionWnd::DrawControls(HDC hDC)
 		);
 	m_lookupBtn.SetBackgroundColor(m_clBackground);
 	m_lookupBtn.ShowBtn(TRUE);
+}
+
+BOOL KSuspensionWnd::IsFullScreenMode()
+{
+	HWND hWnd = ::GetForegroundWindow();
+	if ( hWnd == NULL || hWnd == ::GetDesktopWindow() ) {
+		return FALSE;
+	}
+
+	CRect rcWnd;
+	::GetWindowRect(hWnd, &rcWnd);
+
+	int nScreenWidth = ::GetSystemMetrics(SM_CXSCREEN);
+	int nScreenHeight = ::GetSystemMetrics(SM_CYSCREEN);
+	if ( rcWnd.Width() != nScreenWidth || rcWnd.Height() != nScreenHeight ) {
+		return FALSE;
+	}
+
+	WCHAR szClassName[MAX_PATH] = {0};
+	::GetClassName(hWnd, 
+		szClassName, 
+		sizeof(szClassName)/sizeof(szClassName[0])
+		);
+	return wcsicmp(szClassName, L"progman") != 0;
 }

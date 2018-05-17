@@ -4,12 +4,13 @@
 namespace
 {
 #define DLG_BORDER_COLOR 0XFFFFFF
-#define DLG_BACKGROUND_COLOR 0XFFFFFF
+#define DLG_BACKGROUND_COLOR RGB(0xE6, 0xE4, 0xE4)
 
 #define IMAGE_TOP_SPACE 0
 
 #define TOOLTIP_TOP_SPACE 4
 #define TOOLTIP_LEFT_SPACE 0
+#define TOOLTIP_BOTTOM_SPACE 4
 
 #define TOOLTIP_TEXT_SIZE 13
 #define TOOLTIP_TEXT_COLOR RGB(0x4D, 0x4D, 0x4D)
@@ -79,12 +80,13 @@ void KToolTipWnd::ShowToolTip(
 	if (m_ePosToward != ePosToward)
 	{
 		m_ePosToward = ePosToward;
-		UpdateToolTipRgn();
 	}
 
+	AutoAdjustWindow();
 	MoveWindowPos();
+	UpdateToolTipRgn();
 	
-	m_bIsSingleLine = bIsSingleLine;
+	m_bIsSingleLine = m_vecStrToolTip.size() <= 1;
 
 	if (m_hWnd && !::IsWindowVisible(m_hWnd))
 	{
@@ -166,50 +168,50 @@ void KToolTipWnd::UpdateToolTipRgn()
 		{
 		case TOWARD_LEFT:
 			{
-				m_hToolTipRgn = ::CreateRectRgn(0, 0, rcWnd.Width() - HEIGHT_TRIANG, rcWnd.Height());
-				hTooltipRgn = ::CreateRectRgn(0, 0, rcWnd.Width() - HEIGHT_TRIANG, rcWnd.Height());
-				ptTriang[0].x = rcWnd.Width()- HEIGHT_TRIANG;
-				ptTriang[0].y = rcWnd.Height() / 2 - 3 ;
+				m_hToolTipRgn = ::CreateRectRgn(0, 0, rcWnd.Width() - HEIGHT_TRIANG * m_lfScale, rcWnd.Height());
+				hTooltipRgn = ::CreateRectRgn(0, 0, rcWnd.Width() - HEIGHT_TRIANG * m_lfScale, rcWnd.Height());
+				ptTriang[0].x = rcWnd.Width()- HEIGHT_TRIANG * m_lfScale;
+				ptTriang[0].y = rcWnd.Height() / 2 - 4 * m_lfScale ;
 				ptTriang[1].x = rcWnd.Width();
 				ptTriang[1].y = rcWnd.Height() / 2;
-				ptTriang[2].x = rcWnd.Width() - HEIGHT_TRIANG - 1;
-				ptTriang[2].y = rcWnd.Height() / 2 + 4;
+				ptTriang[2].x = rcWnd.Width() - HEIGHT_TRIANG * m_lfScale;
+				ptTriang[2].y = rcWnd.Height() / 2 + 4 * m_lfScale;
 			}
 			break;
 		case TOWARD_TOP:
 			{
-				m_hToolTipRgn = ::CreateRectRgn(0, 0, rcWnd.Width(), rcWnd.Height() - HEIGHT_TRIANG);
-				hTooltipRgn = ::CreateRectRgn(0, 0, rcWnd.Width(), rcWnd.Height() - HEIGHT_TRIANG);
-				ptTriang[0].x = rcWnd.Width() / 2 - 3;
-				ptTriang[0].y = rcWnd.Height() - HEIGHT_TRIANG;
+				m_hToolTipRgn = ::CreateRectRgn(0, 0, rcWnd.Width(), rcWnd.Height() - HEIGHT_TRIANG * m_lfScale);
+				hTooltipRgn = ::CreateRectRgn(0, 0, rcWnd.Width(), rcWnd.Height() - HEIGHT_TRIANG * m_lfScale);
+				ptTriang[0].x = rcWnd.Width() / 2 - 4 * m_lfScale;
+				ptTriang[0].y = rcWnd.Height() - HEIGHT_TRIANG * m_lfScale;
 				ptTriang[1].x = rcWnd.Width() / 2;
 				ptTriang[1].y = rcWnd.Height();
-				ptTriang[2].x = rcWnd.Width() / 2 + 4;
-				ptTriang[2].y = rcWnd.Height() - HEIGHT_TRIANG - 1;
+				ptTriang[2].x = rcWnd.Width() / 2 + 4 * m_lfScale;
+				ptTriang[2].y = rcWnd.Height() - HEIGHT_TRIANG * m_lfScale;
 			}
 			break;
 		case TOWARD_RIGHT:
 			{
-				m_hToolTipRgn = ::CreateRectRgn(HEIGHT_TRIANG, 0, rcWnd.Width(), rcWnd.Height());
-				hTooltipRgn = ::CreateRectRgn(HEIGHT_TRIANG, 0, rcWnd.Width(), rcWnd.Height());
-				ptTriang[0].x = HEIGHT_TRIANG;
-				ptTriang[0].y = rcWnd.Height() / 2 - 3 ;
+				m_hToolTipRgn = ::CreateRectRgn(HEIGHT_TRIANG * m_lfScale, 0, rcWnd.Width(), rcWnd.Height());
+				hTooltipRgn = ::CreateRectRgn(HEIGHT_TRIANG * m_lfScale, 0, rcWnd.Width(), rcWnd.Height());
+				ptTriang[0].x = HEIGHT_TRIANG * m_lfScale;
+				ptTriang[0].y = rcWnd.Height() / 2 - 4 * m_lfScale ;
 				ptTriang[1].x = 0;
 				ptTriang[1].y = rcWnd.Height() / 2;
-				ptTriang[2].x = HEIGHT_TRIANG - 1;
-				ptTriang[2].y = rcWnd.Height() / 2 + 4;
+				ptTriang[2].x = HEIGHT_TRIANG * m_lfScale;
+				ptTriang[2].y = rcWnd.Height() / 2 + 4 * m_lfScale;
 			}
 			break;
 		case TOWARD_BOTTOM:
 			{
-				m_hToolTipRgn = ::CreateRectRgn(0, HEIGHT_TRIANG, rcWnd.Width(), rcWnd.Height());
-				hTooltipRgn = ::CreateRectRgn(0, HEIGHT_TRIANG, rcWnd.Width(), rcWnd.Height());
-				ptTriang[0].x = rcWnd.Width() / 2 - 3;
-				ptTriang[0].y = HEIGHT_TRIANG;
+				m_hToolTipRgn = ::CreateRectRgn(0, HEIGHT_TRIANG * m_lfScale, rcWnd.Width(), rcWnd.Height());
+				hTooltipRgn = ::CreateRectRgn(0, HEIGHT_TRIANG * m_lfScale, rcWnd.Width(), rcWnd.Height());
+				ptTriang[0].x = rcWnd.Width() / 2 - 4 * m_lfScale;
+				ptTriang[0].y = HEIGHT_TRIANG * m_lfScale;
 				ptTriang[1].x = rcWnd.Width() / 2;
 				ptTriang[1].y = 0;
-				ptTriang[2].x = rcWnd.Width() / 2 + 4;
-				ptTriang[2].y = HEIGHT_TRIANG - 1;
+				ptTriang[2].x = rcWnd.Width() / 2 + 4 * m_lfScale;
+				ptTriang[2].y = HEIGHT_TRIANG * m_lfScale;
 			}
 			break;
 		}
@@ -261,6 +263,59 @@ void KToolTipWnd::MoveWindowPos()
 		}
 		::SetWindowPos(m_hWnd, NULL, x, y, 0, 0, SWP_NOSIZE);
 	}
+}
+
+void KToolTipWnd::AutoAdjustWindow()
+{
+	if (!(m_hWnd && ::IsWindow(m_hWnd)))
+	{
+		return;
+	}
+
+	SIZE szExtent = {};
+	HDC hDC = ::GetDC(m_hWnd);
+	HFONT oldFont = 
+		(HFONT)::SelectObject(hDC, m_hTextFont);
+	RECT rcTipText = {};
+	::GetTextExtentExPoint(hDC, TOOLTIP_TEXT_DEFAULT,
+		(int)wcslen(TOOLTIP_TEXT_DEFAULT),
+		0, NULL, NULL, 
+		&szExtent);
+	::SelectObject(hDC, oldFont);
+	::ReleaseDC(m_hWnd, hDC);
+
+	uint32_t nTipSize = (uint32_t)m_vecStrToolTip.size();
+	CRect rcWnd;
+	::GetClientRect(m_hWnd, &rcWnd);
+	int nReversHeight = 0;
+	switch(m_ePosToward)
+	{
+	case TOWARD_LEFT:
+	case TOWARD_RIGHT:
+		{
+			nReversHeight = (TOOLTIP_TOP_SPACE + TOOLTIP_BOTTOM_SPACE) * m_lfScale;
+		}
+		break;
+	case TOWARD_TOP:
+	case TOWARD_BOTTOM:
+		{
+			nReversHeight = 
+				(TOOLTIP_TOP_SPACE + TOOLTIP_BOTTOM_SPACE
+				+ HEIGHT_TRIANG) * m_lfScale;
+		}
+		break;
+	}
+
+	::SetWindowPos(
+		m_hWnd,
+		nullptr,
+		0,
+		0,
+		rcWnd.Width(),
+		nTipSize * szExtent.cy + nReversHeight
+		+ (nTipSize * TOOLTIP_TEXT_SPACE) * m_lfScale,
+		SWP_NOMOVE | SWP_NOREDRAW | SWP_NOACTIVATE
+		);
 }
 
 void KToolTipWnd::DrawBackground(HDC hDC)
@@ -338,13 +393,22 @@ void KToolTipWnd::DrawOthers(HDC hDC)
 	switch (m_ePosToward)
 	{
 	case TOWARD_LEFT:
-	case TOWARD_TOP:
 	case TOWARD_RIGHT:
 		{
 			rcTipText.left = TOOLTIP_LEFT_SPACE * m_lfScale;
 			rcTipText.top = TOOLTIP_TOP_SPACE * m_lfScale;
 			rcTipText.right = rcTipText.left + nWidth;
-			rcTipText.bottom = rcTipText.top + nHeight;
+			rcTipText.bottom = nHeight 
+				- m_lfScale * TOOLTIP_BOTTOM_SPACE;
+		}
+		break;
+	case TOWARD_TOP:
+		{
+			rcTipText.left = TOOLTIP_LEFT_SPACE * m_lfScale;
+			rcTipText.top = TOOLTIP_TOP_SPACE * m_lfScale;
+			rcTipText.right = rcTipText.left + nWidth;
+			rcTipText.bottom = nHeight 
+				- m_lfScale * (HEIGHT_TRIANG + TOOLTIP_BOTTOM_SPACE);
 		}
 		break;
 	case TOWARD_BOTTOM:
@@ -352,7 +416,7 @@ void KToolTipWnd::DrawOthers(HDC hDC)
 			rcTipText.left = TOOLTIP_LEFT_SPACE * m_lfScale;
 			rcTipText.top = (TOOLTIP_TOP_SPACE + HEIGHT_TRIANG) * m_lfScale;
 			rcTipText.right = rcTipText.left + nWidth;
-			rcTipText.bottom = rcTipText.top + nHeight;
+			rcTipText.bottom = nHeight - m_lfScale * TOOLTIP_BOTTOM_SPACE;
 		}
 		break;
 	}

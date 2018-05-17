@@ -23,6 +23,8 @@ namespace
 #define MENU_ITEM_DISABLE_BACKGROUND_COLOR RGB(190, 190, 190)
 #define MENU_ITEM_LINE_COLOR RGB(0xE8, 0xE8, 0xE8)
 #define MENU_ITEM_LINE_HEIGHT 9
+
+#define MENU_ITEM_DEFAULT _T("内容为空")
 }
 
 HHOOK KMenuWnd::m_hCallProcHook = nullptr;
@@ -147,7 +149,7 @@ LRESULT KMenuWnd::OnMouseLeave(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 
 LRESULT KMenuWnd::OnLButtonDown(WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	::PostMessage(m_hWnd, WM_QUIT, WPARAM(m_nRetID), 0);
+	::PostMessage(m_hWnd, ID_DOCKABLEWND_CLOSEMENU, WPARAM(m_nRetID), 0);
 	bHandled = TRUE;
 	return 0;
 }
@@ -214,6 +216,9 @@ void KMenuWnd::MsgPump()
 	MSG msg = {};
 	while(::GetMessage(&msg, NULL, 0, 0))
 	{
+		if ( msg.message == ID_DOCKABLEWND_CLOSEMENU ) {
+			break;
+		}
 		if((msg.message == WM_LBUTTONDOWN && msg.hwnd != m_hWnd)
 			|| msg.message == WM_NCLBUTTONDOWN)
 		{
@@ -260,6 +265,8 @@ void KMenuWnd::ReSetItemRect()
 	{
 		return;
 	}
+
+	AutoAdjustWindow();
 
 	m_vecMenuRect.clear();
 
@@ -308,6 +315,76 @@ UINT KMenuWnd::GetMenuLineItemCount()
 	return nLineCount;
 }
 
+UINT KMenuWnd::GetMostWidthItemIndex()
+{
+	UINT nMenuPairSize = (UINT)m_vecMenuPair.size();
+	UINT nMostWidth = 0;
+	UINT nIndex = -1;
+	for (UINT index = 0; index < nMenuPairSize; ++index)
+	{
+		if ((UINT)m_vecMenuPair[index].strMenu.size()
+			> nMostWidth)
+		{
+			nMostWidth = (UINT)m_vecMenuPair[index].strMenu.size();
+			nIndex = index;
+		}
+	}
+	return nIndex;
+}
+
+void KMenuWnd::AutoAdjustWindow()
+{
+	if (!(m_hWnd && ::IsWindow(m_hWnd)))
+	{
+		return;
+	}
+
+	UINT nMostItemIndex = GetMostWidthItemIndex();
+	if (nMostItemIndex == (UINT)-1)
+	{
+		return;
+	}
+
+	UINT nLineCount = GetMenuLineItemCount();
+	UINT nMenuPairSize = (UINT)m_vecMenuPair.size();
+	UINT nMenuValidSize = nMenuPairSize - nLineCount;
+	LONG nSpaceHeight = (TOP_SPACE + BOTTOM_SPACE 
+		+ nLineCount * MENU_ITEM_LINE_HEIGHT) * m_lfScale;
+
+	SIZE szExtent = {};
+	HDC hDC = ::GetDC(m_hWnd);
+	HFONT oldFont = 
+		(HFONT)::SelectObject(hDC, m_hTextFont);
+
+	::GetTextExtentExPoint(
+		hDC,
+		m_vecMenuPair[nMostItemIndex].strMenu.c_str(),
+		(int)wcslen(m_vecMenuPair[nMostItemIndex].strMenu.c_str()),
+		0,
+		NULL,
+		NULL,
+		&szExtent
+		);
+	::SelectObject(hDC, oldFont);
+	::ReleaseDC(m_hWnd, hDC);
+
+	CRect rcWnd;
+	::GetClientRect(m_hWnd, &rcWnd);
+	::SetWindowPos(
+		m_hWnd,
+		nullptr,
+		0,
+		0,
+		szExtent.cx + 
+		m_vecMenuPair[nMostItemIndex].nOffset
+		* 2 * m_lfScale, // add space
+		nMenuValidSize * szExtent.cy +
+		+ nMenuValidSize * MENU_ITEM_LINE_HEIGHT * m_lfScale +
+		nSpaceHeight,
+		SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER
+		);
+}
+
 LRESULT CALLBACK KMenuWnd::_HookCallWndProc(
 	__in int nCode,
 	__in WPARAM wParam,
@@ -329,7 +406,11 @@ LRESULT CALLBACK KMenuWnd::_HookCallWndProc(
 			{
 				if(LOWORD(pcwp->wParam) == WA_INACTIVE)
 				{
-					m_pSuspensionMenuWnd->ShowWindow(FALSE);
+					m_pSuspensionMenuWnd->PostMessageW(
+						ID_DOCKABLEWND_CLOSEMENU, 
+						-1, 
+						0
+						);
 					return 0;
 				}
 			}
@@ -339,7 +420,11 @@ LRESULT CALLBACK KMenuWnd::_HookCallWndProc(
 				if(pcwp->wParam == WM_LBUTTONDOWN 
 					|| pcwp->wParam == WM_RBUTTONDOWN)
 				{
-					m_pSuspensionMenuWnd->ShowWindow(FALSE);
+					m_pSuspensionMenuWnd->PostMessageW(
+						ID_DOCKABLEWND_CLOSEMENU, 
+						-1, 
+						0
+						);
 					return 0;
 				}
 			}

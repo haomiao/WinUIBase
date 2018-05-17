@@ -91,6 +91,8 @@ private:
 	UINT GetMenuPairIndex(__in const POINT& pt);
 	void ReSetItemRect();
 	UINT GetMenuLineItemCount();
+	UINT GetMostWidthItemIndex();
+	void AutoAdjustWindow();
 
 private:
 

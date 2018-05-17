@@ -55,6 +55,14 @@ public:
 	--*/
 	BOOL SetOpacity(BYTE nOpacity);
 
+	/*++
+	 * SetDragDropThread
+	 * 设置接收拖放文件消息的线程ID
+	 --*/
+	void SetDragDropThread(
+		__in DWORD dwThreadId
+		);
+
 private:
 
 	virtual void InitResources();
@@ -76,6 +84,7 @@ private:
 	virtual LRESULT OnLButtonDBClk(WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	virtual LRESULT OnMove(WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	virtual LRESULT OnTimer(WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	virtual LRESULT OnClose(WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	
 	LRESULT OnDropFiles(WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	LRESULT OnDropEnter(WPARAM wParam, LPARAM lParam, BOOL& bHandled);
@@ -93,6 +102,7 @@ private:
 	void OpenWPSCloud();
 	void ShowTransDetail();
 	void OpenDragDir();
+	void MenuCloseWnd();
 
 	void GetToolTipType(
 		__out KToolTipWnd::TOOLTIP_POS_TOWARD& ePosToward,
@@ -100,6 +110,7 @@ private:
 		);
 
 	BOOL ChangeTransparency();
+	BOOL IsFullScreenMode();
 
 private:
 
@@ -120,6 +131,7 @@ private:
 	UINT_PTR m_nIDEvent;
 	byte m_nOpacity;
 	byte m_nLastOpacity;
+	DWORD m_dwThreadId;
 
 	typedef BOOL (__stdcall *PFUNCSETLAYEREDWINDOWATTR)(HWND, COLORREF, BYTE, DWORD);
 	PFUNCSETLAYEREDWINDOWATTR m_fSetLayeredWindowAttributes;

@@ -80,6 +80,7 @@ private:
 	void InitImages();
 	void UpdateToolTipRgn();
 	void MoveWindowPos();
+	void AutoAdjustWindow();
 
 private:
 
