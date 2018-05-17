@@ -115,7 +115,7 @@ BOOL KWindowBase::RegisterWnd(__in const wchar_t* pStrClasName)
 
     WNDCLASSEXW wc = {}; 
     wc.cbSize = sizeof(WNDCLASSEXW);
-    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC; 
+    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS; 
     wc.lpfnWndProc = (WNDPROC)_WndProc; 
     wc.cbClsExtra = 0; 
     wc.cbWndExtra = 0; 
